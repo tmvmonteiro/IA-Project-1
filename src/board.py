@@ -1,13 +1,15 @@
 import numpy as np
+import copy
 
 class Board:
-    def __init__(self, matrix):
+    def __init__(self, matrix, moves=None):
         """
         Initializes the board using a pre-existing NumPy matrix.
         """
         self.matrix = np.array(matrix)
         self.size = self.matrix.shape[0]
-        self.moves = 0
+        self.number_moves = 0
+        self.moves = moves if moves is not None else []
         
         # Validation: Ensure the matrix is square
         if self.matrix.shape[0] != self.matrix.shape[1]:
@@ -31,10 +33,22 @@ class Board:
             if 0 <= row < self.size and 0 <= col < self.size:
                 self.matrix[row, col] = 1 - self.matrix[row, col]
         
-        self.moves += 1
+        self.moves.append((r, c))
+        self.number_moves += 1
 
     def is_solved(self):
         return np.all(self.matrix == 0)
     
+    def child_board_states(self):
+        new_states = []
+        for r in range(self.size):
+            for c in range(self.size):
+                # Create a deep copy to avoid modifying the current board
+                new_board = copy.deepcopy(self)
+                new_board.toggle(r, c)
+                # Store the state and the move coordinates (optional metadata)
+                new_states.append((new_board, (r, c)))
+        return new_states
+    
     def __repr__(self):
-        return f"Board Size: {self.size}x{self.size} | Moves: {self.moves}\n{self.matrix}"
+        return f"Board Size: {self.size}x{self.size} | Moves: {self.number_moves}\n{self.matrix}"
