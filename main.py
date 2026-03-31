@@ -5,15 +5,18 @@ from src import solver
 import time
 import sys
 
+def get_grid_from_mask(logic_board):
+    """Helper to convert integer bitmask back to a 2D list for the UI."""
+    size = logic_board.size
+    return [[(logic_board.matrix >> (r * size + c)) & 1 
+             for c in range(size)] 
+            for r in range(size)]
+
 def handle_ui_click(r, c, logic_board, ui_window):
-    """
-    Standalone controller function.
-    Coordinates updates between the logic and the UI.
-    """
-    
     logic_board.toggle(r, c)
     
-    ui_window.draw(logic_board.matrix)
+    grid = get_grid_from_mask(logic_board)
+    ui_window.draw(grid)
     
     if logic_board.is_solved():
         ui_window.root.destroy()

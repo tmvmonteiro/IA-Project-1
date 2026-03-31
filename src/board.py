@@ -2,53 +2,67 @@ import numpy as np
 import copy
 
 class Board:
-    def __init__(self, matrix, moves=None):
+    def __init__(self, matrix, size, moves=None, number_moves=0):
         """
         Initializes the board using a pre-existing NumPy matrix.
         """
-        self.matrix = np.array(matrix)
-        self.size = self.matrix.shape[0]
+        self.matrix = int(matrix)
+        self.size = size
         self.number_moves = 0
         self.moves = moves if moves is not None else []
         
-        # Validation: Ensure the matrix is square
-        if self.matrix.shape[0] != self.matrix.shape[1]:
-            raise ValueError("The input matrix must be square (NxN).")
-
     @classmethod
     def from_csv(cls, file_path):
         """
         Creates a Board instance by reading a CSV file.
         """
         data = np.loadtxt(file_path, delimiter=',', dtype=int)
-        return cls(data)
+        size = data.shape[0]
+        matrix_int = 0
+        for r in range(size):
+            for c in range(size):
+                if data[r, c] == 1:
+                    # Map 2D coordinates to a 1D bit position
+                    matrix_int |= (1 << (r * size + c))
+                    
+        return cls(matrix_int, size)
 
     def toggle(self, r, c):
         """
         Toggles the cell (r, c) and its neighbors (Up, Down, Left, Right).
         """
         targets = [(r, c), (r-1, c), (r+1, c), (r, c-1), (r, c+1)]
+        mask = 0
         
         for row, col in targets:
             if 0 <= row < self.size and 0 <= col < self.size:
-                self.matrix[row, col] = 1 - self.matrix[row, col]
+                mask |= (1 << (row * self.size + col))
         
+        self.matrix ^= mask
         self.moves.append((r, c))
         self.number_moves += 1
 
     def is_solved(self):
-        return np.all(self.matrix == 0)
+        return self.matrix == 0
     
     def child_board_states(self):
         new_states = []
         for r in range(self.size):
             for c in range(self.size):
-                # Create a deep copy to avoid modifying the current board
-                new_board = copy.deepcopy(self)
+                new_board = Board(self.matrix, self.size, list(self.moves), self.number_moves)
                 new_board.toggle(r, c)
-                # Store the state and the move coordinates (optional metadata)
                 new_states.append((new_board, (r, c)))
         return new_states
     
     def __repr__(self):
-        return f"Board Size: {self.size}x{self.size} | Moves: {self.number_moves}\n{self.matrix}"
+        # Reconstructs the grid visually for debugging
+        grid_rows = []
+        for r in range(self.size):
+            row = []
+            for c in range(self.size):
+                is_on = (self.matrix >> (r * self.size + c)) & 1
+                row.append(str(is_on))
+            grid_rows.append(" ".join(row))
+        
+        visual = "\n".join(grid_rows)
+        return f"Board Size: {self.size}x{self.size} | Moves: {self.number_moves}\n{visual}"

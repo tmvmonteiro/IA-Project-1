@@ -19,7 +19,7 @@ def breadth_first_search(initial_state, goal_state_func, operators_func):
     queue = deque([root])
 
     visited = set()
-    visited.add(tuple(initial_state.matrix.flatten()))
+    visited.add(initial_state.matrix)
 
     while queue:
         node = queue.popleft()
@@ -27,10 +27,8 @@ def breadth_first_search(initial_state, goal_state_func, operators_func):
             return node
 
         for state, _ in operators_func(node.state):
-            state_tuple = tuple(state.matrix.flatten())
-            
-            if state_tuple not in visited:
-                visited.add(state_tuple)
+            if state.matrix not in visited:
+                visited.add(state.matrix)
                 child = TreeNode(state, parent=node)
                 node.add_child(child)
                 queue.append(child)
