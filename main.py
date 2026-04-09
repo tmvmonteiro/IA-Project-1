@@ -4,6 +4,7 @@ from src.window import Window
 from src import solver
 import time
 import sys
+import csv
 
 def get_grid_from_mask(logic_board):
     """Helper to convert integer bitmask back to a 2D list for the UI."""
@@ -21,10 +22,33 @@ def handle_ui_click(r, c, logic_board, ui_window):
     if logic_board.is_solved():
         ui_window.root.destroy()
 
+def print_solution(solutions):
+    for algorithm, result, time in solutions:
+        if result is not None:
+            print(f"Algorithm: {algorithm} | Time: {time:.7f} | {result.state}")
+
+def to_csv(solutions, file_path="output/results_example.csv"):
+    headers = ["Algorithm", "Time (s)", "Board Size", "Number of Moves"]
+    
+    with open(file_path, mode='w', newline='') as file:
+        writer = csv.writer(file)
+        writer.writerow(headers)
+        
+        for algorithm, result, time_taken in solutions:
+            if result is not None:
+                row = [
+                    algorithm, 
+                    f"{time_taken:.7f}", 
+                    result.state.size, 
+                    len(result.state.moves)
+                ]
+                writer.writerow(row)
+
 def main():
     if len(sys.argv) > 1:
         game_mode = sys.argv[1]
         logic_board = Board.from_csv("input/example.csv")
+        solutions = None
         if (game_mode == "game"):
             ui_window = Window(on_click_callback=None)
             
@@ -41,7 +65,11 @@ def main():
             end_time = time.time()
             print(f"Board solved in {end_time - start_time} seconds.\n")
         else:
-            solver.solve(logic_board, game_mode)
+            solutions = solver.solve(logic_board, game_mode)
+
+        print_solution(solutions)
+        to_csv(solutions)   
+
     else:
         print(f"TO IMPLEMENT\n")
 

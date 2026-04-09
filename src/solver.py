@@ -6,32 +6,34 @@ def compar(x):
     return x[1]
 
 def solve(logic_board, game_mode):
+    solution = []
     if (game_mode == "bfs"):
         start_time = time.time()
         result = breadth_first_search(logic_board, Board.is_solved, Board.child_board_states)
         end_time = time.time()
-        print(f"Board solved in {end_time - start_time} seconds.\n")
-        print(result.state.moves)
+        duration = end_time - start_time
+        solution.append(("bfs", result, duration))
     elif (game_mode == "ucs"):
         start_time = time.time()
-        result = breadth_first_search(logic_board, Board.is_solved, Board.child_board_states)
+        result = uniform_cost_search(logic_board, Board.is_solved, Board.child_board_states)
         end_time = time.time()
-        print(f"Board solved in {end_time - start_time} seconds.\n")
-        print(result.state.moves)
+        duration = end_time - start_time
+        solution.append(("ucs", result, duration))
     elif (game_mode == "greedy"):
         start_time = time.time()
         result = greedy_search(logic_board, Board.is_solved, Board.child_board_states, greedy)
         end_time = time.time()
-        print(f"Board solved in {end_time - start_time} seconds.\n")
-        print(sorted(result.state.moves, key=lambda x: (x[0], x[1])))
+        duration = end_time - start_time
+        solution.append(("greedy", result, duration))
     elif (game_mode == "astar"):
         start_time = time.time()
         result = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy)
         end_time = time.time()
-        print(f"Board solved in {end_time - start_time} seconds.\n")
-        print(sorted(result.state.moves, key=lambda x: (x[0], x[1])))
+        duration = end_time - start_time
+        solution.append(("astar", result, duration))
     else:
         print("Need to insert correct game mode")
+    return solution
 
 def breadth_first_search(initial_state, goal_state_func, operators_func):
     root = TreeNode(initial_state)
@@ -55,7 +57,7 @@ def breadth_first_search(initial_state, goal_state_func, operators_func):
 
     return None
 
-def breadth_first_search(initial_state, goal_state_func, operators_func):
+def uniform_cost_search(initial_state, goal_state_func, operators_func):
     root = TreeNode(initial_state)
     queue = [root]
 

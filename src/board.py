@@ -1,5 +1,4 @@
 import numpy as np
-import copy
 
 class Board:
     def __init__(self, matrix, size, moves=None):
@@ -53,14 +52,4 @@ class Board:
         return new_states
     
     def __repr__(self):
-        # Reconstructs the grid visually for debugging
-        grid_rows = []
-        for r in range(self.size):
-            row = []
-            for c in range(self.size):
-                is_on = (self.matrix >> (r * self.size + c)) & 1
-                row.append(str(is_on))
-            grid_rows.append(" ".join(row))
-        
-        visual = "\n".join(grid_rows)
-        return f"Board Size: {self.size}x{self.size} | Moves: {len(self.moves)}\n{visual}"
+        return f"Board Length: {self.size} | Number of moves: {len(self.moves)} | Moves: {sorted(self.moves, key=lambda x: (x[0], x[1]))}\n"
