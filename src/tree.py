@@ -7,7 +7,7 @@ class TreeNode:
         self.children = []
         self.cost = 0   # the path cost to get to this state
     
-    def add_child(self, child_node, operator_cost=1):
+    def add_child(self, child_node, operator_cost):
         self.children.append(child_node)
-        child_node.cost = self.cost + operator_cost   # the path cost is the parent's cost plus this operator cost
+        child_node.cost = operator_cost   # the path cost is the parent's cost plus this operator cost
         child_node.parent = self

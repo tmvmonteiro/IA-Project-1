@@ -2,13 +2,12 @@ import numpy as np
 import copy
 
 class Board:
-    def __init__(self, matrix, size, moves=None, number_moves=0):
+    def __init__(self, matrix, size, moves=None):
         """
         Initializes the board using a pre-existing NumPy matrix.
         """
         self.matrix = int(matrix)
         self.size = size
-        self.number_moves = 0
         self.moves = moves if moves is not None else []
         
     @classmethod
@@ -40,7 +39,6 @@ class Board:
         
         self.matrix ^= mask
         self.moves.append((r, c))
-        self.number_moves += 1
 
     def is_solved(self):
         return self.matrix == 0
@@ -49,9 +47,9 @@ class Board:
         new_states = []
         for r in range(self.size):
             for c in range(self.size):
-                new_board = Board(self.matrix, self.size, list(self.moves), self.number_moves)
+                new_board = Board(self.matrix, self.size, list(self.moves))
                 new_board.toggle(r, c)
-                new_states.append((new_board, (r, c)))
+                new_states.append(new_board)
         return new_states
     
     def __repr__(self):
@@ -65,4 +63,4 @@ class Board:
             grid_rows.append(" ".join(row))
         
         visual = "\n".join(grid_rows)
-        return f"Board Size: {self.size}x{self.size} | Moves: {self.number_moves}\n{visual}"
+        return f"Board Size: {self.size}x{self.size} | Moves: {len(self.moves)}\n{visual}"
