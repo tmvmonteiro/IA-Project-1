@@ -31,6 +31,12 @@ def solve(logic_board, game_mode):
         end_time = time.time()
         duration = end_time - start_time
         solution.append(("astar", result, duration))
+    elif (game_mode == "wastar"):
+        start_time = time.time()
+        result = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy, 2)
+        end_time = time.time()
+        duration = end_time - start_time
+        solution.append(("wastar", result, duration))
     else:
         print("Need to insert correct game mode")
     return solution
@@ -105,10 +111,10 @@ def greedy_search(initial_state, goal_state_func, operators_func, heuristic_func
     
     return None
 
-def greedy(node):
-    return bin(node.state.matrix).count('1')
+def greedy(node, weigth=1):
+    return weigth * bin(node.state.matrix).count('1')
 
-def astar_search(initial_state, goal_state_func, operators_func, heuristic_func):
+def astar_search(initial_state, goal_state_func, operators_func, heuristic_func, weigth=1):
     root = TreeNode(initial_state)
     queue = [root]
 
@@ -125,7 +131,7 @@ def astar_search(initial_state, goal_state_func, operators_func, heuristic_func)
                 visited.add(state.matrix)
                 child = TreeNode(state, parent=node)  
                 g_n = len(state.moves)
-                h_n = heuristic_func(child)
+                h_n = heuristic_func(child, weigth)
                 node.add_child(child, g_n + h_n)
                 queue.append(child)
         
