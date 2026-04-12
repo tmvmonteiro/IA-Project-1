@@ -22,32 +22,70 @@ def handle_ui_click(r, c, logic_board, ui_window):
     if logic_board.is_solved():
         ui_window.root.destroy()
 
-def print_solution(solutions):
-    for algorithm, result, time in solutions:
-        if result is not None:
-            print(f"Algorithm: {algorithm} | Time: {time:.7f} | {result.state}")
-
-def to_csv(solutions, file_path="output/results_example.csv"):
-    headers = ["Algorithm", "Time (s)", "Board Size", "Number of Moves"]
+def print_solution(solutions, initial_logic_board):
+    size = initial_logic_board.size
+    matrix_str = ""
+    for r in range(size):
+        row = [(initial_logic_board.matrix >> (r * size + c)) & 1 for c in range(size)]
+        matrix_str += " ".join(map(str, row)) + "\n"
     
-    with open(file_path, mode='w', newline='') as file:
-        writer = csv.writer(file)
-        writer.writerow(headers)
-        
+    print(f"=== REPORT ===\n")
+    print(f"INITIAL MATRIX ({size}x{size}):")
+    print(matrix_str)
+    print("-" * 30 + "\n")
+
+    for algorithm, result, time_taken in solutions:
+        if result is not None:
+            print(f"Algorithm:           {algorithm.upper()}")
+            print(f"Time:                {time_taken:.7f} seconds")
+            print(f"Board Size:          {result.state.size}x{result.state.size}")
+            print(f"Number of Movements: {len(result.state.moves)}")
+            print(f"Sequence:            {result.state.moves}")
+            print("-" * 30 + "\n")
+
+def to_txt(solutions, file, initial_logic_board):
+    file_path = str('output/results_' + file)
+
+    size = initial_logic_board.size
+    matrix_str = ""
+    for r in range(size):
+        row = [(initial_logic_board.matrix >> (r * size + c)) & 1 for c in range(size)]
+        matrix_str += " ".join(map(str, row)) + "\n"
+    
+    with open(file_path, mode='w', encoding='utf-8') as f:
+        f.write("=== REPORT ===\n\n")
+        f.write(f"INITIAL MATRIX ({size}x{size}):\n")
+        f.write(matrix_str)
+        f.write("-" * 30 + "\n")
+
         for algorithm, result, time_taken in solutions:
             if result is not None:
-                row = [
-                    algorithm, 
-                    f"{time_taken:.7f}", 
-                    result.state.size, 
-                    len(result.state.moves)
-                ]
-                writer.writerow(row)
+                f.write(f"Algorithm:           {algorithm.upper()}\n")
+                f.write(f"Time:                {time_taken:.7f} seconds\n")
+                f.write(f"Board Size:          {result.state.size}x{result.state.size}\n")
+                f.write(f"Number of Movements: {len(result.state.moves)}\n")
+                f.write(f"Sequence:            {result.state.moves}\n")
+                f.write("-" * 30 + "\n")
 
 def main():
     if len(sys.argv) > 1:
         game_mode = sys.argv[1]
-        logic_board = Board.from_csv("input/example.csv")
+        file = None
+        logic_board = None
+        if len(sys.argv) > 2:
+            try:
+                file = sys.argv[2]
+                logic_board = Board.from_csv(str('input/' + file))
+            except:
+                print(f"Error: Failed to load board from '{file}'.\nDetails: {Exception}")
+                sys.exit(1)
+        else:
+            try:
+                file = 'example.csv'
+                logic_board = Board.from_csv(str('input/' + file))
+            except:
+                print(f"Error: Failed to load board from '{file}'.\nDetails: {Exception}")
+                sys.exit(1)
         solutions = None
         if (game_mode == "game"):
             ui_window = Window(on_click_callback=None)
@@ -67,8 +105,8 @@ def main():
         else:
             solutions = solver.solve(logic_board, game_mode)
 
-        print_solution(solutions)
-        to_csv(solutions)   
+        print_solution(solutions, logic_board)
+        to_txt(solutions, file, logic_board)   
 
     else:
         print(f"TO IMPLEMENT\n")
