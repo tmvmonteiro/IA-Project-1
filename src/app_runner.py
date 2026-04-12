@@ -28,7 +28,7 @@ def build_board_options():
     for file_name in files:
         path = INPUT_DIR / file_name
         try:
-            size = Board.from_csv(str(path)).size
+            size = Board.from_txt(str(path)).size
         except Exception:
             size = None
 
@@ -85,7 +85,7 @@ def launch_mode_selector(ui_window, print_solution, to_txt):
                 report_name = f"random_{board_size}x{board_size}.txt"
             else:
                 input_path = resolve_input_path(config["file_name"])
-                logic_board = Board.from_csv(str(input_path))
+                logic_board = Board.from_txt(str(input_path))
                 board_label = f"{input_path.name} ({logic_board.size}x{logic_board.size})"
                 report_name = input_path.name
         except Exception as exc:

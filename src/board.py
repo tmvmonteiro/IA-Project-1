@@ -1,28 +1,38 @@
-import csv
 import random
+import re
 
 class Board:
     def __init__(self, matrix, size, moves=None):
         """
-        Initializes the board using a pre-existing NumPy matrix.
+        Initializes the board using a pre-existing bitmask.
         """
         self.matrix = int(matrix)
         self.size = size
         self.moves = moves if moves is not None else []
         
     @classmethod
-    def from_csv(cls, file_path):
+    def from_txt(cls, file_path):
         """
-        Creates a Board instance by reading a CSV file.
+        Creates a Board instance by reading a plain-text board file.
         """
-        with open(file_path, newline="", encoding="utf-8") as file_handle:
-            data = [
-                [int(value) for value in row]
-                for row in csv.reader(file_handle)
-                if row
-            ]
+        with open(file_path, encoding="utf-8") as file_handle:
+            rows = [line.strip() for line in file_handle if line.strip()]
+
+        data = []
+        for row in rows:
+            values = [int(value) for value in re.split(r"[\s,]+", row) if value]
+            data.append(values)
 
         size = len(data)
+        if size == 0:
+            raise ValueError(f"Board file '{file_path}' is empty.")
+
+        if any(len(row) != size for row in data):
+            raise ValueError(f"Board file '{file_path}' must contain a square matrix.")
+
+        if any(value not in (0, 1) for row in data for value in row):
+            raise ValueError(f"Board file '{file_path}' must contain only 0 and 1 values.")
+
         matrix_int = 0
         for r in range(size):
             for c in range(size):

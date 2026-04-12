@@ -52,11 +52,13 @@ class Window:
         self.menu_mode_options = []
         self.menu_callback = None
         self.menu_selected_index = 0
+        self.menu_selected_file_name = None
         self.menu_selected_mode = "game"
         self.menu_solver_view = "solution"
         self.menu_source = "file"
         self.menu_random_size = 5
         self.menu_random_toggles = 6
+        self.menu_initialized = False
 
         self.game_board = None
         self.game_board_snapshot = None
@@ -106,17 +108,64 @@ class Window:
         self.solver_result_stats = {}
         self.solver_result_on_back = None
 
+    def _select_menu_board_by_index(self, index):
+        if not self.menu_board_options:
+            self.menu_selected_index = 0
+            self.menu_selected_file_name = None
+            return
+
+        self.menu_selected_index = index % len(self.menu_board_options)
+        self.menu_selected_file_name = self.menu_board_options[self.menu_selected_index]["name"]
+
+    def _sync_menu_state(self, reset=False):
+        if self.menu_board_options:
+            if reset or self.menu_selected_file_name is None:
+                self._select_menu_board_by_index(0)
+            else:
+                matching_index = next(
+                    (
+                        index
+                        for index, option in enumerate(self.menu_board_options)
+                        if option["name"] == self.menu_selected_file_name
+                    ),
+                    None,
+                )
+                if matching_index is None:
+                    self._select_menu_board_by_index(min(self.menu_selected_index, len(self.menu_board_options) - 1))
+                else:
+                    self._select_menu_board_by_index(matching_index)
+        else:
+            self.menu_selected_index = 0
+            self.menu_selected_file_name = None
+
+        available_modes = {mode for _, mode in self.menu_mode_options}
+        if reset or self.menu_selected_mode not in available_modes:
+            self.menu_selected_mode = self.menu_mode_options[0][1] if self.menu_mode_options else "game"
+
+        if reset or self.menu_source not in {"file", "random"}:
+            self.menu_source = "file"
+
+        if reset or self.menu_solver_view not in {"solution", "search"}:
+            self.menu_solver_view = "solution"
+
+        default_size = max(3, (self.menu_board_options[0]["size"] or 5)) if self.menu_board_options else 5
+        if reset:
+            self.menu_random_size = default_size
+            self.menu_random_toggles = max(1, self.menu_random_size)
+        else:
+            self.menu_random_size = max(3, self.menu_random_size)
+            self.menu_random_toggles = max(
+                1,
+                min(self.menu_random_size * self.menu_random_size, self.menu_random_toggles),
+            )
+
     def show_menu(self, board_options, mode_options, on_mode_select):
         self.state = "menu"
         self.menu_board_options = board_options
         self.menu_mode_options = mode_options
         self.menu_callback = on_mode_select
-        self.menu_selected_index = 0
-        self.menu_selected_mode = mode_options[0][1] if mode_options else "game"
-        self.menu_solver_view = "solution"
-        self.menu_source = "file"
-        self.menu_random_size = max(3, board_options[0]["size"] or 5)
-        self.menu_random_toggles = max(1, self.menu_random_size)
+        self._sync_menu_state(reset=not self.menu_initialized)
+        self.menu_initialized = True
 
     def show_game(self, board, board_label, on_back_callback=None, on_solved_callback=None):
         self.state = "game"
@@ -596,12 +645,12 @@ class Window:
 
             prev_rect = pygame.Rect(left.x + 24, left.y + 180, 42, 38)
             next_rect = pygame.Rect(left.x + 454, left.y + 180, 42, 38)
-            self._button(prev_rect, "<", lambda: setattr(self, "menu_selected_index", (self.menu_selected_index - 1) % len(self.menu_board_options)))
-            self._button(next_rect, ">", lambda: setattr(self, "menu_selected_index", (self.menu_selected_index + 1) % len(self.menu_board_options)))
+            self._button(prev_rect, "<", lambda: self._select_menu_board_by_index(self.menu_selected_index - 1))
+            self._button(next_rect, ">", lambda: self._select_menu_board_by_index(self.menu_selected_index + 1))
 
             preview_rect = pygame.Rect(left.x + 84, left.y + 170, 350, 260)
             try:
-                preview_board = Board.from_csv(selected["path"])
+                preview_board = Board.from_txt(selected["path"])
                 self._draw_board(preview_board, preview_rect, interactive=False)
             except Exception as exc:
                 self._card(preview_rect, fill=self.palette["panel_alt"])
