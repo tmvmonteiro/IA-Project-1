@@ -10,10 +10,8 @@ class Window:
     WIDTH = 1280
     HEIGHT = 860
     SOLVER_STEP_MS = 500
-    GAME_AUTO_STEP_MS = 500
     MODE_LABEL_OVERRIDES = {
         "gf2": "GF(2)",
-        "random_player": "Random Player",
     }
 
     def __init__(self, on_click_callback=None):
@@ -76,9 +74,6 @@ class Window:
         self.game_on_back = None
         self.game_on_solved = None
         self.game_hint_move = None
-        self.game_last_move = None
-        self.game_auto_play_random = False
-        self.game_last_auto_step_at = 0
 
         self.solver_initial_board = None
         self.solver_current_board = None
@@ -123,15 +118,16 @@ class Window:
     def _load_theme(self, theme_name):
         self.current_theme = theme_name
 
+
         base_path = f"themes/{theme_name}"
         try:
-            self.tile_on_img = pygame.image.load(f"{base_path}/On.png").convert_alpha()
-            self.tile_off_img = pygame.image.load(f"{base_path}/Off.png").convert_alpha()
+                self.tile_on_img = pygame.image.load(f"{base_path}/On.png").convert_alpha()
+                self.tile_off_img = pygame.image.load(f"{base_path}/Off.png").convert_alpha()
         except Exception:
-            self.tile_on_img = pygame.image.load("themes/Simple/On.png").convert_alpha()
-            self.tile_off_img = pygame.image.load("themes/Simple/Off.png").convert_alpha()
-                
 
+                self.tile_on_img = pygame.image.load("themes/Classic/On.png").convert_alpha()
+                self.tile_off_img = pygame.image.load("themes/Classic/Off.png").convert_alpha()
+                
     def _select_menu_board_by_index(self, index):
         if not self.menu_board_options:
             self.menu_selected_index = 0
@@ -191,7 +187,7 @@ class Window:
         self._sync_menu_state(reset=not self.menu_initialized)
         self.menu_initialized = True
 
-    def show_game(self, board, board_label, on_back_callback=None, on_solved_callback=None, auto_play_random=False):
+    def show_game(self, board, board_label, on_back_callback=None, on_solved_callback=None):
         self.state = "game"
         self.game_board = Board(board.matrix, board.size, list(board.moves))
         self.game_board_snapshot = Board(board.matrix, board.size, list(board.moves))
@@ -200,9 +196,6 @@ class Window:
         self.game_on_back = on_back_callback
         self.game_on_solved = on_solved_callback
         self.game_hint_move = None
-        self.game_last_move = None
-        self.game_auto_play_random = auto_play_random
-        self.game_last_auto_step_at = self.game_started_at
         self.click_targets = []
 
     def show_solver(
@@ -243,10 +236,7 @@ class Window:
             return
 
         board_copy = Board(board.matrix, board.size, list(board.moves))
-        if mode == "gf2":
-            solved = gf2_solver.solve(board_copy)
-        else:
-            solved = solver.solve(board_copy, mode)
+        solved = gf2_solver.solve(board_copy) if mode == "gf2" else solver.solve(board_copy, mode)
         if solved:
             _, result_node, elapsed, metrics = solved[0]
             self.solver_result_node = result_node
@@ -516,29 +506,24 @@ class Window:
                     cell_size,
                 )
 
+                # 🔹 Select correct image
+                img = self.tile_on_img if value else self.tile_off_img
+
+                # 🔹 Scale image to fit cell
+                img_scaled = pygame.transform.scale(img, (cell_rect.width, cell_rect.height))
+
+                # 🔹 Draw image
+                self.screen.blit(img_scaled, cell_rect.topleft)
+
+                # Border (hover effect)
                 border = self.palette["cell_border"]
                 if cell_rect.collidepoint(mouse_pos) and interactive:
                     border = self.palette["accent"]
 
                 radius = max(1, min(10, cell_size // 3))
-
-                if self.current_theme == "Simple":
-                    fill = self.palette["on"] if value else self.palette["off"]
-                    pygame.draw.rect(self.screen, fill, cell_rect, border_radius=radius)
-                else:
-                    img = self.tile_on_img if value else self.tile_off_img
-                    if img:
-                        img_scaled = pygame.transform.scale(img, (cell_rect.width, cell_rect.height))
-                        self.screen.blit(img_scaled, cell_rect.topleft)
-                    else:
-                        # fallback safety
-                        fill = self.palette["on"] if value else self.palette["off"]
-                        pygame.draw.rect(self.screen, fill, cell_rect, border_radius=radius)
-
-                # border
                 pygame.draw.rect(self.screen, border, cell_rect, 2, border_radius=radius)
 
-                # highlight last move
+                # Highlight last move
                 if last_move is not None and (row, col) == last_move:
                     pygame.draw.rect(
                         self.screen,
@@ -548,7 +533,7 @@ class Window:
                         border_radius=radius + 2,
                     )
 
-                # hint highlight
+                # Hint highlight
                 if hint_move is not None and (row, col) == hint_move:
                     pygame.draw.rect(
                         self.screen,
@@ -558,6 +543,7 @@ class Window:
                         border_radius=radius + 4,
                     )
 
+                # Click handling
                 if interactive and on_cell_click is not None:
                     self._register_click(cell_rect, lambda r=row, c=col: on_cell_click(r, c))
 
@@ -650,14 +636,6 @@ class Window:
                 if self.solver_on_finished is not None:
                     self.solver_on_finished(result_node, elapsed, {"visited_states": self.solver_visited})
 
-    def _advance_random_game_step(self):
-        if self.game_board is None or self.game_board.is_solved():
-            return
-
-        row = random.randrange(self.game_board.size)
-        col = random.randrange(self.game_board.size)
-        self._click_game_cell(row, col)
-
     def _handle_click(self, pos):
         for rect, callback in reversed(self.click_targets):
             if rect.collidepoint(pos):
@@ -681,7 +659,12 @@ class Window:
                 self.game_on_back()
                 return True
             if event.key == pygame.K_r:
-                self._reset_game_board()
+                self.game_board = Board(
+                    self.game_board_snapshot.matrix,
+                    self.game_board_snapshot.size,
+                    list(self.game_board_snapshot.moves),
+                )
+                self.game_started_at = pygame.time.get_ticks()
                 return True
         return False
 
@@ -862,7 +845,7 @@ class Window:
             pygame.Rect(note_rect.x + 18, note_rect.y + 82, note_rect.width - 36, 40),
             line_spacing=1,
         )
-
+        # 🔹 Theme selection
         theme_title_y = right.bottom - 150
         self._text("Theme", self.font_heading, self.palette["text"], right.x + 24, theme_title_y)
 
@@ -895,39 +878,28 @@ class Window:
     def _draw_game(self):
         self._draw_background()
         self._clear_click_targets()
-        title = "Random Player" if self.game_auto_play_random else "Play Mode"
-        self._draw_top_header(title, self.game_board_label)
+        self._draw_top_header("Play Mode", self.game_board_label)
 
         board_area = pygame.Rect(36, 120, 786, 686)
         side_area = pygame.Rect(846, 120, 398, 686)
         self._draw_board(
             self.game_board,
             board_area,
-            interactive=not self.game_auto_play_random,
-            on_cell_click=None if self.game_auto_play_random else self._click_game_cell,
-            highlight=self.game_last_move,
-            hint=None if self.game_auto_play_random else self.game_hint_move,
+            interactive=True,
+            on_cell_click=self._click_game_cell,
+            hint=self.game_hint_move,
         )
         self._card(side_area)
 
         self._text("Status", self.font_heading, self.palette["text"], side_area.x + 24, side_area.y + 20)
         elapsed = (pygame.time.get_ticks() - self.game_started_at) / 1000.0
-        if self.game_auto_play_random:
-            status_lines = [
-                "Mode: Random autoplay",
-                f"Moves: {len(self.game_board.moves)}",
-                f"Board: {self.game_board.size} x {self.game_board.size}",
-                f"Elapsed: {elapsed:.1f}s",
-                f"Solved: {'yes' if self.game_board.is_solved() else 'no'}",
-            ]
-        else:
-            status_lines = [
-                f"Moves: {len(self.game_board.moves)}",
-                f"Board: {self.game_board.size} x {self.game_board.size}",
-                f"Elapsed: {elapsed:.1f}s",
-                f"Solved: {'yes' if self.game_board.is_solved() else 'no'}",
-                f"Hint: {self.game_hint_move if self.game_hint_move is not None else '-'}",
-            ]
+        status_lines = [
+            f"Moves: {len(self.game_board.moves)}",
+            f"Board: {self.game_board.size} x {self.game_board.size}",
+            f"Elapsed: {elapsed:.1f}s",
+            f"Solved: {'yes' if self.game_board.is_solved() else 'no'}",
+            f"Hint: {self.game_hint_move if self.game_hint_move is not None else '-'}",
+        ]
 
         status_box = pygame.Rect(side_area.x + 20, side_area.y + 58, side_area.width - 40, 164)
         self._card(status_box, fill=self.palette["panel_alt"])
@@ -943,23 +915,13 @@ class Window:
         action_box = pygame.Rect(side_area.x + 20, side_area.y + 244, side_area.width - 40, 230)
         self._card(action_box, fill=self.palette["panel_alt"])
         self._text("Controls", self.font_heading, self.palette["text"], action_box.x + 18, action_box.y + 16)
-        if self.game_auto_play_random:
-            control_lines = [
-                "The random player presses one tile every 500 ms.",
-                "Press R to restart the same board.",
-                "Press Esc to go back to the menu.",
-                "Watch the highlighted tile to follow each move.",
-            ]
-        else:
-            control_lines = [
+        self._draw_text_list(
+            [
                 "Click any tile to toggle it and its neighbors.",
                 "Press R to reset the board.",
                 "Press Esc to go back to the menu.",
                 "Press Hint to highlight the next A* move.",
-            ]
-
-        self._draw_text_list(
-            control_lines,
+            ],
             self.font_small,
             self.palette["muted"],
             pygame.Rect(action_box.x + 18, action_box.y + 54, action_box.width - 36, 106),
@@ -968,10 +930,7 @@ class Window:
         )
 
         hint_rect = pygame.Rect(action_box.x + 18, action_box.y + 170, action_box.width - 36, 44)
-        if self.game_auto_play_random:
-            self._button(hint_rect, "Random Player Active", None, disabled=True)
-        else:
-            self._button(hint_rect, "Hint", self._compute_hint, accent=True)
+        self._button(hint_rect, "Hint", self._compute_hint, accent=True)
 
         back_rect = pygame.Rect(side_area.x + 20, side_area.bottom - 74, 150, 50)
         reset_rect = pygame.Rect(side_area.right - 170, side_area.bottom - 74, 150, 50)
@@ -984,7 +943,6 @@ class Window:
 
         self.game_board.toggle(row, col)
         self.game_hint_move = None
-        self.game_last_move = (row, col)
         self.game_started_at = self.game_started_at if self.game_started_at else pygame.time.get_ticks()
 
         if self.game_board.is_solved() and self.game_on_solved is not None:
@@ -1052,8 +1010,6 @@ class Window:
         )
         self.game_hint_move = None
         self.game_started_at = pygame.time.get_ticks()
-        self.game_last_move = None
-        self.game_last_auto_step_at = self.game_started_at
 
     def _compute_hint(self):
         if self.game_board is None or self.game_board.is_solved():
@@ -1118,7 +1074,7 @@ class Window:
         self._card(info_box, fill=self.palette["panel_alt"])
         if self.solver_playback_mode == "solution":
             info_lines = [
-                "Algorithm runs first, then only the final move sequence is shown.",
+                "Algorithm solves first, then only solution moves are shown.",
                 "Playback step interval: 500 ms per move.",
                 "Report opens after the final solution move.",
             ]
@@ -1159,7 +1115,6 @@ class Window:
         time_taken = self.solver_result_stats.get("time", 0.0)
         visited_states = self.solver_result_stats.get("visited_states", 0)
         move_count = self.solver_result_stats.get("moves", 0)
-        solved = self.solver_result_stats.get("solved", True)
 
         status_box = pygame.Rect(side_area.x + 20, side_area.y + 58, side_area.width - 40, 210)
         self._card(status_box, fill=self.palette["panel_alt"])
@@ -1167,8 +1122,7 @@ class Window:
             f"Algorithm: {self._mode_label(self.solver_result_mode)}",
             f"Execution: {time_taken:.3f}s",
             f"Visited states: {visited_states}",
-            f"Outcome: {'Solved' if solved else 'No solution'}",
-            f"{'Moves in solution' if solved else 'Moves attempted'}: {move_count}",
+            f"Moves in solution: {move_count}",
         ]
         self._draw_text_list(
             lines,
@@ -1182,11 +1136,7 @@ class Window:
         msg_rect = pygame.Rect(side_area.x + 20, side_area.y + 286, side_area.width - 40, 124)
         self._card(msg_rect, fill=self.palette["panel_alt"])
         self._draw_wrapped_text(
-            (
-                "Search completed. Use Back to try another board or algorithm."
-                if solved
-                else "No solution was found within the algorithm limit. Use Back to try another board or algorithm."
-            ),
+            "Search completed. Use Back to try another board or algorithm.",
             self.font_body,
             self.palette["muted"],
             pygame.Rect(msg_rect.x + 16, msg_rect.y + 18, msg_rect.width - 32, msg_rect.height - 20),
@@ -1280,19 +1230,6 @@ class Window:
                 if now - self.solver_last_step_at >= self.SOLVER_STEP_MS:
                     self.solver_last_step_at = now
                     self._advance_solver_step()
-
-            should_advance_random_game = (
-                self.state == "game"
-                and self.game_auto_play_random
-                and self.game_board is not None
-                and not self.game_board.is_solved()
-            )
-
-            if should_advance_random_game:
-                now = pygame.time.get_ticks()
-                if now - self.game_last_auto_step_at >= self.GAME_AUTO_STEP_MS:
-                    self.game_last_auto_step_at = now
-                    self._advance_random_game_step()
 
             if self.state == "menu":
                 self._draw_menu()
