@@ -118,15 +118,16 @@ class Window:
     def _load_theme(self, theme_name):
         self.current_theme = theme_name
 
+
         base_path = f"themes/{theme_name}"
         try:
-            self.tile_on_img = pygame.image.load(f"{base_path}/On.png").convert_alpha()
-            self.tile_off_img = pygame.image.load(f"{base_path}/Off.png").convert_alpha()
+                self.tile_on_img = pygame.image.load(f"{base_path}/On.png").convert_alpha()
+                self.tile_off_img = pygame.image.load(f"{base_path}/Off.png").convert_alpha()
         except Exception:
-            self.tile_on_img = pygame.image.load("themes/Simple/On.png").convert_alpha()
-            self.tile_off_img = pygame.image.load("themes/Simple/Off.png").convert_alpha()
-                
 
+                self.tile_on_img = pygame.image.load("themes/Classic/On.png").convert_alpha()
+                self.tile_off_img = pygame.image.load("themes/Classic/Off.png").convert_alpha()
+                
     def _select_menu_board_by_index(self, index):
         if not self.menu_board_options:
             self.menu_selected_index = 0
@@ -505,29 +506,24 @@ class Window:
                     cell_size,
                 )
 
+                # 🔹 Select correct image
+                img = self.tile_on_img if value else self.tile_off_img
+
+                # 🔹 Scale image to fit cell
+                img_scaled = pygame.transform.scale(img, (cell_rect.width, cell_rect.height))
+
+                # 🔹 Draw image
+                self.screen.blit(img_scaled, cell_rect.topleft)
+
+                # Border (hover effect)
                 border = self.palette["cell_border"]
                 if cell_rect.collidepoint(mouse_pos) and interactive:
                     border = self.palette["accent"]
 
                 radius = max(1, min(10, cell_size // 3))
-
-                if self.current_theme == "Simple":
-                    fill = self.palette["on"] if value else self.palette["off"]
-                    pygame.draw.rect(self.screen, fill, cell_rect, border_radius=radius)
-                else:
-                    img = self.tile_on_img if value else self.tile_off_img
-                    if img:
-                        img_scaled = pygame.transform.scale(img, (cell_rect.width, cell_rect.height))
-                        self.screen.blit(img_scaled, cell_rect.topleft)
-                    else:
-                        # fallback safety
-                        fill = self.palette["on"] if value else self.palette["off"]
-                        pygame.draw.rect(self.screen, fill, cell_rect, border_radius=radius)
-
-                # border
                 pygame.draw.rect(self.screen, border, cell_rect, 2, border_radius=radius)
 
-                # highlight last move
+                # Highlight last move
                 if last_move is not None and (row, col) == last_move:
                     pygame.draw.rect(
                         self.screen,
@@ -537,7 +533,7 @@ class Window:
                         border_radius=radius + 2,
                     )
 
-                # hint highlight
+                # Hint highlight
                 if hint_move is not None and (row, col) == hint_move:
                     pygame.draw.rect(
                         self.screen,
@@ -547,6 +543,7 @@ class Window:
                         border_radius=radius + 4,
                     )
 
+                # Click handling
                 if interactive and on_cell_click is not None:
                     self._register_click(cell_rect, lambda r=row, c=col: on_cell_click(r, c))
 
@@ -848,7 +845,7 @@ class Window:
             pygame.Rect(note_rect.x + 18, note_rect.y + 82, note_rect.width - 36, 40),
             line_spacing=1,
         )
-
+        # 🔹 Theme selection
         theme_title_y = right.bottom - 150
         self._text("Theme", self.font_heading, self.palette["text"], right.x + 24, theme_title_y)
 
