@@ -2,7 +2,7 @@ import random
 
 import pygame
 
-from src import solver
+from src import gf2_solver, solver
 from src.board import Board
 
 
@@ -10,6 +10,9 @@ class Window:
     WIDTH = 1280
     HEIGHT = 860
     SOLVER_STEP_MS = 500
+    MODE_LABEL_OVERRIDES = {
+        "gf2": "GF(2)",
+    }
 
     def __init__(self, on_click_callback=None):
         pygame.init()
@@ -192,7 +195,7 @@ class Window:
         self.solver_current_board = Board(board.matrix, board.size, list(board.moves))
         self.solver_board_label = board_label
         self.solver_mode = mode
-        self.solver_playback_mode = playback_mode
+        self.solver_playback_mode = "solution" if mode == "gf2" else playback_mode
         self.solver_generator = None
         self.solver_solution_moves = []
         self.solver_solution_index = 0
@@ -211,11 +214,12 @@ class Window:
         self.solver_on_finished = on_finished_callback
         self.click_targets = []
 
-        if playback_mode == "search":
+        if self.solver_playback_mode == "search":
             self.solver_generator = solver.iter_search(Board(board.matrix, board.size, list(board.moves)), mode)
             return
 
-        solved = solver.solve(Board(board.matrix, board.size, list(board.moves)), mode)
+        board_copy = Board(board.matrix, board.size, list(board.moves))
+        solved = gf2_solver.solve(board_copy) if mode == "gf2" else solver.solve(board_copy, mode)
         if solved:
             _, result_node, elapsed, metrics = solved[0]
             self.solver_result_node = result_node
@@ -334,15 +338,46 @@ class Window:
         self.screen.set_clip(clip)
         return target
 
-    def _draw_wrapped_text(self, text, font, color, rect, line_spacing=4):
+    def _draw_wrapped_text(self, text, font, color, rect, line_spacing=4, align="left"):
+        if rect.width <= 0 or rect.height <= 0:
+            return 0
+
         lines = self._wrap_text(text, font, rect.width)
         line_height = font.get_linesize() + line_spacing
         y = rect.y
+        drawn_lines = 0
         for line in lines:
             if y + line_height > rect.bottom:
                 break
-            self._text_box(line, font, color, pygame.Rect(rect.x, y, rect.width, line_height), align="left")
+            self._text_box(line, font, color, pygame.Rect(rect.x, y, rect.width, line_height), align=align)
             y += line_height
+            drawn_lines += 1
+
+        if drawn_lines == 0:
+            return 0
+
+        return y - rect.y
+
+    def _draw_text_list(self, lines, font, color, rect, *, line_spacing=4, item_spacing=6, align="left"):
+        y = rect.y
+        for line in lines:
+            available_height = rect.bottom - y
+            if available_height <= 0:
+                break
+
+            used_height = self._draw_wrapped_text(
+                line,
+                font,
+                color,
+                pygame.Rect(rect.x, y, rect.width, available_height),
+                line_spacing=line_spacing,
+                align=align,
+            )
+            if used_height <= 0:
+                break
+            y += used_height + item_spacing
+
+        return y - rect.y
 
     def _button(self, rect, text, callback, *, selected=False, accent=False, disabled=False):
         if disabled:
@@ -364,7 +399,10 @@ class Window:
 
         pygame.draw.rect(self.screen, fill, rect, border_radius=16)
         pygame.draw.rect(self.screen, border, rect, 1, border_radius=16)
-        self._text(text, self.font_body, text_color, rect.centerx, rect.centery, center=True)
+        label_rect = rect.inflate(-12, -8)
+        if label_rect.width <= 0 or label_rect.height <= 0:
+            label_rect = rect
+        self._text_box(text, self.font_body, text_color, label_rect, align="center")
 
         if callback is not None and not disabled:
             self._register_click(rect, callback)
@@ -411,6 +449,9 @@ class Window:
 
         self.screen.set_clip(clip)
         return max_scroll
+
+    def _mode_label(self, mode):
+        return self.MODE_LABEL_OVERRIDES.get(mode, mode.upper())
 
     def _board_metrics(self, board, area):
         padding = 18
@@ -636,11 +677,12 @@ class Window:
         if self.menu_source == "file":
             selected = self.menu_board_options[self.menu_selected_index]
             self._text("Selected board", self.font_small, self.palette["muted"], left.x + 24, left.y + 112)
-            self._text_box(
+            self._draw_wrapped_text(
                 selected["label"],
                 self.font_body,
                 self.palette["text"],
-                pygame.Rect(left.x + 24, left.y + 136, left.width - 48, 24),
+                pygame.Rect(left.x + 24, left.y + 136, left.width - 48, 44),
+                line_spacing=2,
             )
 
             prev_rect = pygame.Rect(left.x + 24, left.y + 180, 42, 38)
@@ -654,11 +696,32 @@ class Window:
                 self._draw_board(preview_board, preview_rect, interactive=False)
             except Exception as exc:
                 self._card(preview_rect, fill=self.palette["panel_alt"])
-                self._text("Preview unavailable", self.font_heading, self.palette["danger"], preview_rect.centerx, preview_rect.centery - 10, center=True)
-                self._text(str(exc), self.font_small, self.palette["muted"], preview_rect.centerx, preview_rect.centery + 18, center=True)
+                self._text_box(
+                    "Preview unavailable",
+                    self.font_heading,
+                    self.palette["danger"],
+                    pygame.Rect(preview_rect.x + 16, preview_rect.y + 18, preview_rect.width - 32, 28),
+                    align="center",
+                )
+                self._draw_wrapped_text(
+                    str(exc),
+                    self.font_small,
+                    self.palette["muted"],
+                    pygame.Rect(preview_rect.x + 18, preview_rect.y + 58, preview_rect.width - 36, preview_rect.height - 76),
+                    line_spacing=2,
+                )
 
-            self._text("Use the arrows to move between input boards.", self.font_small, self.palette["muted"], left.x + 24, left.y + 448)
-            self._text("The board label includes its size.", self.font_small, self.palette["muted"], left.x + 24, left.y + 470)
+            self._draw_text_list(
+                [
+                    "Use the arrows to move between input boards.",
+                    "The board label includes its size.",
+                ],
+                self.font_small,
+                self.palette["muted"],
+                pygame.Rect(left.x + 24, left.y + 448, left.width - 48, 52),
+                line_spacing=2,
+                item_spacing=4,
+            )
         else:
             self._text("Board size", self.font_small, self.palette["muted"], left.x + 24, left.y + 112)
             size_value = pygame.Rect(left.x + 24, left.y + 134, 170, 56)
@@ -683,8 +746,17 @@ class Window:
             preview_board = Board.random_board(self.menu_random_size, self.menu_random_toggles, rng=random.Random(preview_seed))
             self._draw_board(preview_board, preview_rect, interactive=False)
 
-            self._text("This board is generated from a clean board, so it is always solvable.", self.font_small, self.palette["muted"], left.x + 24, left.y + 580)
-            self._text("Use the toggle count to tune the puzzle intensity.", self.font_small, self.palette["muted"], left.x + 24, left.y + 602)
+            self._draw_text_list(
+                [
+                    "This board is generated from a clean board, so it is always solvable.",
+                    "Use the toggle count to tune the puzzle intensity.",
+                ],
+                self.font_small,
+                self.palette["muted"],
+                pygame.Rect(left.x + 24, left.y + 580, left.width - 48, 58),
+                line_spacing=2,
+                item_spacing=4,
+            )
 
         mode_area = pygame.Rect(right.x + 24, right.y + 58, right.width - 48, 470)
         cols = 2
@@ -730,8 +802,8 @@ class Window:
             "Final Path: solve first, then animate only the winning moves. Every Expanded Node: show full search process at 500 ms.",
             self.font_small,
             self.palette["muted"],
-            pygame.Rect(note_rect.x + 18, note_rect.y + 82, note_rect.width - 36, 36),
-            line_spacing=2,
+            pygame.Rect(note_rect.x + 18, note_rect.y + 82, note_rect.width - 36, 40),
+            line_spacing=1,
         )
 
         launch_rect = pygame.Rect(right.x + 24, right.bottom - 82, right.width - 48, 52)
@@ -768,18 +840,31 @@ class Window:
 
         status_box = pygame.Rect(side_area.x + 20, side_area.y + 58, side_area.width - 40, 164)
         self._card(status_box, fill=self.palette["panel_alt"])
-        y = status_box.y + 18
-        for line in status_lines:
-            self._text(line, self.font_body, self.palette["text"], status_box.x + 18, y)
-            y += 32
+        self._draw_text_list(
+            status_lines,
+            self.font_body,
+            self.palette["text"],
+            pygame.Rect(status_box.x + 18, status_box.y + 18, status_box.width - 36, status_box.height - 36),
+            line_spacing=2,
+            item_spacing=6,
+        )
 
         action_box = pygame.Rect(side_area.x + 20, side_area.y + 244, side_area.width - 40, 230)
         self._card(action_box, fill=self.palette["panel_alt"])
         self._text("Controls", self.font_heading, self.palette["text"], action_box.x + 18, action_box.y + 16)
-        self._text("Click any tile to toggle it and its neighbors.", self.font_body, self.palette["muted"], action_box.x + 18, action_box.y + 54)
-        self._text("Press R to reset the board.", self.font_body, self.palette["muted"], action_box.x + 18, action_box.y + 82)
-        self._text("Press Esc to go back to the menu.", self.font_body, self.palette["muted"], action_box.x + 18, action_box.y + 110)
-        self._text("Press Hint to highlight the next A* move.", self.font_body, self.palette["muted"], action_box.x + 18, action_box.y + 138)
+        self._draw_text_list(
+            [
+                "Click any tile to toggle it and its neighbors.",
+                "Press R to reset the board.",
+                "Press Esc to go back to the menu.",
+                "Press Hint to highlight the next A* move.",
+            ],
+            self.font_small,
+            self.palette["muted"],
+            pygame.Rect(action_box.x + 18, action_box.y + 54, action_box.width - 36, 106),
+            line_spacing=2,
+            item_spacing=6,
+        )
 
         hint_rect = pygame.Rect(action_box.x + 18, action_box.y + 170, action_box.width - 36, 44)
         self._button(hint_rect, "Hint", self._compute_hint, accent=True)
@@ -829,10 +914,14 @@ class Window:
             f"Moves: {self.win_move_count}",
             f"Board: {self.win_board.size} x {self.win_board.size}" if self.win_board else "Board: -",
         ]
-        y = right.y + 98
-        for line in stats:
-            self._text(line, self.font_body, self.palette["text"], right.x + 16, y)
-            y += 34
+        self._draw_text_list(
+            stats,
+            self.font_body,
+            self.palette["text"],
+            pygame.Rect(right.x + 16, right.y + 98, right.width - 32, 108),
+            line_spacing=2,
+            item_spacing=8,
+        )
 
         message_rect = pygame.Rect(right.x + 16, right.y + 230, right.width - 32, 120)
         self._draw_wrapped_text(
@@ -888,7 +977,7 @@ class Window:
         self._draw_background()
         self._clear_click_targets()
         playback_label = "Final Path" if self.solver_playback_mode == "solution" else "Every Expanded Node"
-        self._draw_top_header("Solver View", f"{self.solver_mode.upper()} - {self.solver_board_label} - {playback_label}")
+        self._draw_top_header("Solver View", f"{self._mode_label(self.solver_mode)} - {self.solver_board_label} - {playback_label}")
 
         board_area = pygame.Rect(36, 120, 786, 686)
         side_area = pygame.Rect(846, 120, 398, 686)
@@ -909,21 +998,37 @@ class Window:
             f"Visited: {shown_visited}",
             f"Last move: {self.solver_last_move if self.solver_last_move is not None else '-'}",
         ]
-        y = status_box.y + 18
-        for line in details:
-            self._text(line, self.font_body, self.palette["text"], status_box.x + 18, y)
-            y += 32
+        self._draw_text_list(
+            details,
+            self.font_body,
+            self.palette["text"],
+            pygame.Rect(status_box.x + 18, status_box.y + 18, status_box.width - 36, status_box.height - 36),
+            line_spacing=2,
+            item_spacing=6,
+        )
 
         info_box = pygame.Rect(side_area.x + 20, side_area.y + 286, side_area.width - 40, 124)
         self._card(info_box, fill=self.palette["panel_alt"])
         if self.solver_playback_mode == "solution":
-            self._text("Algorithm solves first, then only solution moves are shown.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 20)
-            self._text("Playback step interval: 500 ms per move.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 50)
-            self._text("Report opens after the final solution move.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 80)
+            info_lines = [
+                "Algorithm solves first, then only solution moves are shown.",
+                "Playback step interval: 500 ms per move.",
+                "Report opens after the final solution move.",
+            ]
         else:
-            self._text("This screen advances one search expansion every 500 ms.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 20)
-            self._text("The last expanded node stays highlighted on the board.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 50)
-            self._text("When the solution is found, the final report opens automatically.", self.font_body, self.palette["muted"], info_box.x + 18, info_box.y + 80)
+            info_lines = [
+                "This screen advances one search expansion every 500 ms.",
+                "The last expanded node stays highlighted on the board.",
+                "When the solution is found, the final report opens automatically.",
+            ]
+        self._draw_text_list(
+            info_lines,
+            self.font_small,
+            self.palette["muted"],
+            pygame.Rect(info_box.x + 18, info_box.y + 18, info_box.width - 36, info_box.height - 32),
+            line_spacing=2,
+            item_spacing=4,
+        )
 
         back_rect = pygame.Rect(side_area.x + 20, side_area.bottom - 74, 150, 50)
         stop_rect = pygame.Rect(side_area.right - 170, side_area.bottom - 74, 150, 50)
@@ -951,15 +1056,19 @@ class Window:
         status_box = pygame.Rect(side_area.x + 20, side_area.y + 58, side_area.width - 40, 210)
         self._card(status_box, fill=self.palette["panel_alt"])
         lines = [
-            f"Algorithm: {self.solver_result_mode.upper()}",
+            f"Algorithm: {self._mode_label(self.solver_result_mode)}",
             f"Execution: {time_taken:.3f}s",
             f"Visited states: {visited_states}",
             f"Moves in solution: {move_count}",
         ]
-        y = status_box.y + 18
-        for line in lines:
-            self._text(line, self.font_body, self.palette["text"], status_box.x + 18, y)
-            y += 36
+        self._draw_text_list(
+            lines,
+            self.font_body,
+            self.palette["text"],
+            pygame.Rect(status_box.x + 18, status_box.y + 18, status_box.width - 36, status_box.height - 36),
+            line_spacing=2,
+            item_spacing=8,
+        )
 
         msg_rect = pygame.Rect(side_area.x + 20, side_area.y + 286, side_area.width - 40, 124)
         self._card(msg_rect, fill=self.palette["panel_alt"])
@@ -986,7 +1095,13 @@ class Window:
 
         title_box = pygame.Rect(report_area.x + 22, report_area.y + 18, report_area.width - 44, 60)
         self._card(title_box, fill=self.palette["panel_alt"])
-        self._text(self.report_title, self.font_heading, self.palette["text"], title_box.x + 18, title_box.y + 18)
+        self._draw_wrapped_text(
+            self.report_title,
+            self.font_heading,
+            self.palette["text"],
+            pygame.Rect(title_box.x + 18, title_box.y + 14, title_box.width - 36, title_box.height - 20),
+            line_spacing=2,
+        )
 
         text_box = pygame.Rect(report_area.x + 22, report_area.y + 94, report_area.width - 44, 500)
         self._card(text_box, fill=self.palette["panel_alt"])

@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import time
 
-from src import solver
+from src import gf2_solver, solver
 from src.app_runner import build_board_options, launch_mode_selector, resolve_input_path
 from src.board import Board
 
@@ -11,6 +11,9 @@ from src.board import Board
 BASE_DIR = Path(__file__).resolve().parent
 OUTPUT_DIR = BASE_DIR / "output"
 TK_UI_ALIASES = {"tk", "tkinter", "legacy"}
+ALGORITHM_LABELS = {
+    "gf2": "GF(2)",
+}
 
 
 def get_grid_from_mask(logic_board):
@@ -31,6 +34,10 @@ def create_window(ui_backend, on_click_callback=None):
     from src.pygame_window import Window as PygameWindow
 
     return PygameWindow(on_click_callback=on_click_callback)
+
+
+def format_algorithm_name(algorithm):
+    return ALGORITHM_LABELS.get(algorithm, algorithm.upper())
 
 
 def parse_cli_args(argv):
@@ -80,7 +87,7 @@ def print_solution(solutions, initial_logic_board):
             algorithm, result, time_taken = entry
             metrics = {}
 
-        print(f"Algorithm:           {algorithm.upper()}")
+        print(f"Algorithm:           {format_algorithm_name(algorithm)}")
         print(f"Time:                {time_taken:.7f} seconds")
         print(f"Visited States:      {metrics.get('visited_states', '-')}")
         if result is not None:
@@ -116,7 +123,7 @@ def to_txt(solutions, file_name, initial_logic_board):
                 algorithm, result, time_taken = entry
                 metrics = {}
 
-            file_handle.write(f"Algorithm:           {algorithm.upper()}\n")
+            file_handle.write(f"Algorithm:           {format_algorithm_name(algorithm)}\n")
             file_handle.write(f"Time:                {time_taken:.7f} seconds\n")
             file_handle.write(f"Visited States:      {metrics.get('visited_states', '-')}\n")
             if result is not None:
@@ -216,7 +223,7 @@ def main():
             run_game_mode(ui_backend, logic_board, resolved_name)
             return
 
-        solutions = solver.solve(logic_board, game_mode)
+        solutions = gf2_solver.solve(logic_board) if game_mode == "gf2" else solver.solve(logic_board, game_mode)
         print_solution(solutions, logic_board)
         to_txt(solutions, resolved_name, logic_board)
         return

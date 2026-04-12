@@ -13,6 +13,7 @@ MODE_OPTIONS = [
     ("Greedy", "greedy"),
     ("A*", "astar"),
     ("Weighted A*", "wastar"),
+    ("Algebraic Solve: GF(2)", "gf2"),
 ]
 MODE_LABELS = {mode: label for label, mode in MODE_OPTIONS}
 
