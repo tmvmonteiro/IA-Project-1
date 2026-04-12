@@ -45,8 +45,8 @@ class Board:
     @classmethod
     def random_board(cls, size, toggle_count=None, rng=None):
         """
-        Creates a solvable random board by starting from a clean board and toggling
-        a set of unique cells.
+        Creates a solvable random board by starting from a clean board and applying
+        a set of unique random presses.
         """
         if size <= 0:
             raise ValueError("Board size must be greater than zero.")
@@ -58,14 +58,18 @@ class Board:
 
         toggle_count = max(0, min(toggle_count, max_cells))
 
-        board = cls(0, size)
         positions = [(r, c) for r in range(size) for c in range(size)]
+        chosen_positions = rng.sample(positions, toggle_count)
+        matrix = 0
 
-        for row, col in rng.sample(positions, toggle_count):
-            board.toggle(row, col)
+        # Sample without replacement so the same press position is never applied twice.
+        for row, col in chosen_positions:
+            targets = ((row, col), (row - 1, col), (row + 1, col), (row, col - 1), (row, col + 1))
+            for target_row, target_col in targets:
+                if 0 <= target_row < size and 0 <= target_col < size:
+                    matrix ^= 1 << (target_row * size + target_col)
 
-        board.moves = []
-        return board
+        return cls(matrix, size, [])
 
     def toggle(self, r, c):
         """

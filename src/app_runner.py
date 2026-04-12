@@ -8,6 +8,7 @@ BASE_DIR = Path(__file__).resolve().parent.parent
 INPUT_DIR = BASE_DIR / "input"
 MODE_OPTIONS = [
     ("Play", "game"),
+    ("Random Player", "random_player"),
     ("BFS", "bfs"),
     ("UCS", "ucs"),
     ("Greedy", "greedy"),
@@ -93,13 +94,13 @@ def launch_mode_selector(ui_window, print_solution, to_txt):
             ui_window.show_report("Error", str(exc), on_back_callback=show_menu)
             return
 
-        if config["mode"] == "game":
+        if config["mode"] in {"game", "random_player"}:
 
             def show_game_report(solved_board, elapsed_seconds):
                 game_result = type("Result", (), {"state": solved_board})()
-                solutions = [("game", game_result, elapsed_seconds, {})]
-                print_solution(solutions, solved_board)
-                to_txt(solutions, report_name, solved_board)
+                solutions = [(config["mode"], game_result, elapsed_seconds, {})]
+                print_solution(solutions, logic_board)
+                to_txt(solutions, report_name, logic_board)
                 ui_window.show_win_screen(
                     solved_board,
                     board_label,
@@ -112,13 +113,19 @@ def launch_mode_selector(ui_window, print_solution, to_txt):
                 board_label,
                 on_back_callback=show_menu,
                 on_solved_callback=show_game_report,
+                auto_play_random=config["mode"] == "random_player",
             )
             return
 
         def show_solver_report(result_node, elapsed_seconds, stats):
             result_stats = dict(stats)
             result_stats["time"] = elapsed_seconds
-            result_stats["moves"] = len(result_node.state.moves) if result_node is not None else 0
+            result_stats["solved"] = result_node is not None
+            result_stats["moves"] = (
+                len(result_node.state.moves)
+                if result_node is not None
+                else result_stats.get("attempted_moves", 0)
+            )
 
             solutions = [(config["mode"], result_node, elapsed_seconds, result_stats)]
             print_solution(solutions, logic_board)

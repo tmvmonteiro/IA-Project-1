@@ -3,7 +3,7 @@ from pathlib import Path
 import sys
 import time
 
-from src import gf2_solver, solver
+from src import gf2_solver, random_player, solver
 from src.app_runner import build_board_options, launch_mode_selector, resolve_input_path
 from src.board import Board
 
@@ -13,6 +13,7 @@ OUTPUT_DIR = BASE_DIR / "output"
 TK_UI_ALIASES = {"tk", "tkinter", "legacy"}
 ALGORITHM_LABELS = {
     "gf2": "GF(2)",
+    "random_player": "Random Player",
 }
 
 
@@ -95,6 +96,10 @@ def print_solution(solutions, initial_logic_board):
             print(f"Number of Movements: {len(result.state.moves)}")
             print(f"Sequence:            {result.state.moves}")
         else:
+            if "attempted_moves" in metrics:
+                print(f"Attempted Moves:     {metrics['attempted_moves']}")
+            if "max_steps" in metrics:
+                print(f"Step Limit:          {metrics['max_steps']}")
             print("Result:              No solution found")
         print("-" * 30 + "\n")
 
@@ -131,6 +136,10 @@ def to_txt(solutions, file_name, initial_logic_board):
                 file_handle.write(f"Number of Movements: {len(result.state.moves)}\n")
                 file_handle.write(f"Sequence:            {result.state.moves}\n")
             else:
+                if "attempted_moves" in metrics:
+                    file_handle.write(f"Attempted Moves:     {metrics['attempted_moves']}\n")
+                if "max_steps" in metrics:
+                    file_handle.write(f"Step Limit:          {metrics['max_steps']}\n")
                 file_handle.write("Result:              No solution found\n")
             file_handle.write("-" * 30 + "\n")
 
@@ -223,7 +232,12 @@ def main():
             run_game_mode(ui_backend, logic_board, resolved_name)
             return
 
-        solutions = gf2_solver.solve(logic_board) if game_mode == "gf2" else solver.solve(logic_board, game_mode)
+        if game_mode == "gf2":
+            solutions = gf2_solver.solve(logic_board)
+        elif game_mode == "random_player":
+            solutions = random_player.solve(logic_board)
+        else:
+            solutions = solver.solve(logic_board, game_mode)
         print_solution(solutions, logic_board)
         to_txt(solutions, resolved_name, logic_board)
         return
