@@ -4,14 +4,15 @@ from src.window import Window
 from src import solver
 import time
 import sys
-import csv
+import numpy as np
 
 def get_grid_from_mask(logic_board):
-    """Helper to convert integer bitmask back to a 2D list for the UI."""
+    """Helper to convert integer bitmask back to a 2D NumPy array for the UI."""
     size = logic_board.size
-    return [[(logic_board.matrix >> (r * size + c)) & 1 
+    grid = [[(logic_board.matrix >> (r * size + c)) & 1 
              for c in range(size)] 
             for r in range(size)]
+    return np.array(grid)
 
 def handle_ui_click(r, c, logic_board, ui_window):
     logic_board.toggle(r, c)
@@ -81,7 +82,7 @@ def main():
                 sys.exit(1)
         else:
             try:
-                file = 'example.csv'
+                file = 'example.txt'
                 logic_board = Board.from_csv(str('input/' + file))
             except:
                 print(f"Error: Failed to load board from '{file}'.\nDetails: {Exception}")
@@ -96,7 +97,8 @@ def main():
                 ui_window=ui_window
             )
 
-            ui_window.draw(logic_board.matrix)
+            grid = get_grid_from_mask(logic_board)
+            ui_window.draw(grid)
 
             start_time = time.time()
             ui_window.run()  
