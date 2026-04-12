@@ -109,7 +109,24 @@ def main():
         to_txt(solutions, file, logic_board)   
 
     else:
-        print(f"TO IMPLEMENT\n")
+        # default board
+        logic_board = Board(5, 0)
+
+        ui_window = Window(on_click_callback=None)
+
+        ui_window.on_click_callback = partial(
+            handle_ui_click,
+            logic_board=logic_board,
+            ui_window=ui_window
+        )
+
+        # IMPORTANT: set initial board display
+        ui_window.current_matrix = get_grid_from_mask(logic_board)
+
+        # start in menu OR game (choose one)
+
+        ui_window.draw()   # <-- THIS opens the menu (if your Window has menu state)
+        ui_window.run()
 
 if __name__ == "__main__":
     main()
