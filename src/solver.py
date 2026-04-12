@@ -1,140 +1,83 @@
 from src.board import Board
 from src.tree import TreeNode
+from src.solver_engine import search as _engine_search
+from src.solver_engine import iter_search as _engine_iter_search
 import time
+
 
 def compar(x):
     return x[1]
+
 
 def solve(logic_board, game_mode):
     solution = []
     if (game_mode == "bfs"):
         start_time = time.time()
-        result = breadth_first_search(logic_board, Board.is_solved, Board.child_board_states)
+        result, visited_states = breadth_first_search(logic_board, Board.is_solved, Board.child_board_states, True)
         end_time = time.time()
         duration = end_time - start_time
-        solution.append(("bfs", result, duration))
+        solution.append(("bfs", result, duration, {"visited_states": visited_states}))
     elif (game_mode == "ucs"):
         start_time = time.time()
-        result = uniform_cost_search(logic_board, Board.is_solved, Board.child_board_states)
+        result, visited_states = uniform_cost_search(logic_board, Board.is_solved, Board.child_board_states, True)
         end_time = time.time()
         duration = end_time - start_time
-        solution.append(("ucs", result, duration))
+        solution.append(("ucs", result, duration, {"visited_states": visited_states}))
     elif (game_mode == "greedy"):
         start_time = time.time()
-        result = greedy_search(logic_board, Board.is_solved, Board.child_board_states, greedy)
+        result, visited_states = greedy_search(logic_board, Board.is_solved, Board.child_board_states, greedy, True)
         end_time = time.time()
         duration = end_time - start_time
-        solution.append(("greedy", result, duration))
+        solution.append(("greedy", result, duration, {"visited_states": visited_states}))
     elif (game_mode == "astar"):
         start_time = time.time()
-        result = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy)
+        result, visited_states = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy, 1, True)
         end_time = time.time()
         duration = end_time - start_time
-        solution.append(("astar", result, duration))
+        solution.append(("astar", result, duration, {"visited_states": visited_states}))
     elif (game_mode == "wastar"):
         start_time = time.time()
-        result = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy, 2)
+        result, visited_states = astar_search(logic_board, Board.is_solved, Board.child_board_states, greedy, 2, True)
         end_time = time.time()
         duration = end_time - start_time
-        solution.append(("wastar", result, duration))
+        solution.append(("wastar", result, duration, {"visited_states": visited_states}))
     else:
         print("Need to insert correct game mode")
     return solution
 
-def breadth_first_search(initial_state, goal_state_func, operators_func):
-    root = TreeNode(initial_state)
-    queue = [root]
 
-    visited = set()
-    visited.add(initial_state.matrix)
+def breadth_first_search(initial_state, goal_state_func, operators_func, return_stats=False):
+    result, visited_states = _engine_search(initial_state, "bfs")
+    if return_stats:
+        return result, visited_states
+    return result
 
-    while queue:
-        node = queue.pop(0)
-        if goal_state_func(node.state):
-            return node
 
-        for state in operators_func(node.state):
-            if state.matrix not in visited:
-                visited.add(state.matrix)
-                child = TreeNode(state, parent=node)
-                g_n = len(state.moves)
-                node.add_child(child, g_n)
-                queue.append(child)
+def uniform_cost_search(initial_state, goal_state_func, operators_func, return_stats=False):
+    result, visited_states = _engine_search(initial_state, "ucs")
+    if return_stats:
+        return result, visited_states
+    return result
 
-    return None
 
-def uniform_cost_search(initial_state, goal_state_func, operators_func):
-    root = TreeNode(initial_state)
-    queue = [root]
+def greedy_search(initial_state, goal_state_func, operators_func, heuristic_func, return_stats=False):
+    result, visited_states = _engine_search(initial_state, "greedy")
+    if return_stats:
+        return result, visited_states
+    return result
 
-    visited = set()
-    visited.add(initial_state.matrix)
-
-    while queue:
-        node = queue.pop(0)
-        if goal_state_func(node.state):
-            return node
-
-        for state in operators_func(node.state):
-            if state.matrix not in visited:
-                visited.add(state.matrix)
-                child = TreeNode(state, parent=node)
-                g_n = len(state.moves)
-                node.add_child(child, g_n)
-                queue.append(child)
-
-        queue.sort(key=lambda node: node.cost)  
-
-    return None
-
-def greedy_search(initial_state, goal_state_func, operators_func, heuristic_func):
-    root = TreeNode(initial_state)
-    queue = [root]
-
-    visited = set()
-    visited.add(initial_state.matrix)
-
-    while queue:
-        node = queue.pop(0)
-        if goal_state_func(node.state):
-            return node
-
-        for state in operators_func(node.state):
-            if state.matrix not in visited:
-                visited.add(state.matrix)
-                child = TreeNode(state, parent=node)  
-                h_n = heuristic_func(child)     
-                node.add_child(child, h_n)
-                queue.append(child)
-        
-        queue.sort(key=lambda node: node.cost)      
-    
-    return None
 
 def greedy(node, weigth=1):
     return weigth * bin(node.state.matrix).count('1')
 
-def astar_search(initial_state, goal_state_func, operators_func, heuristic_func, weigth=1):
-    root = TreeNode(initial_state)
-    queue = [root]
 
-    visited = set()
-    visited.add(initial_state.matrix)
+def astar_search(initial_state, goal_state_func, operators_func, heuristic_func, weigth=1, return_stats=False):
+    mode = "wastar" if weigth == 2 else "astar"
+    result, visited_states = _engine_search(initial_state, mode)
+    if return_stats:
+        return result, visited_states
+    return result
 
-    while queue:
-        node = queue.pop(0)
-        if goal_state_func(node.state):
-            return node
 
-        for state in operators_func(node.state):
-            if state.matrix not in visited:
-                visited.add(state.matrix)
-                child = TreeNode(state, parent=node)  
-                g_n = len(state.moves)
-                h_n = heuristic_func(child, weigth)
-                node.add_child(child, g_n + h_n)
-                queue.append(child)
-        
-        queue.sort(key=lambda node: node.cost)     
-    
-    return None
+def iter_search(initial_state, game_mode):
+    return _engine_iter_search(initial_state, game_mode)
